@@ -7,11 +7,13 @@ import type { Address } from 'abitype';
 import { isAddress } from 'viem';
 import { toMoreReadable, toStoreFormat } from '../../helpers';
 import { PopoverInfo } from '../PopoverInfo.tsx';
+import { getAccount, HelloContract } from '../../contracts';
 
 export const MintModal: FC = observer(() => {
   const { isHelloContractLoading, symbol, isMintModalOpen, mintModalClose, decimals } = helloTokenContractStore;
   const { isUserLoading, account } = userStore;
-  const isLoading = isHelloContractLoading || isUserLoading;
+  const [isMintLoading, setIsMintLoading] = useState(false);
+  const isLoading = isMintLoading || isHelloContractLoading || isUserLoading;
 
   const [receiver, setReceiver] = useState<Address>('0x');
   const [tokensCount, setTokensCount] = useState<number>(0);
@@ -30,8 +32,18 @@ export const MintModal: FC = observer(() => {
   const timeoutTokensCountRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
   const handleOk = async () => {
-    // await createPost({ tag, content });
-    mintModalClose();
+    try {
+      setIsMintLoading(true);
+      await HelloContract.write.mint([receiver, toStoreFormat(tokensCount, decimals)], { account: await getAccount(true) });
+      await userStore.refetchUser();
+      mintModalClose();
+    } catch (e) {
+      const errorMessage = `Ошибка перевода: ${e instanceof Error ? e.message : e}`;
+      alert(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsMintLoading(false);
+    }
   };
 
   const afterOpenChange = () => {

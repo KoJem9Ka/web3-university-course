@@ -7,11 +7,13 @@ import type { Address } from 'abitype';
 import { isAddress } from 'viem';
 import { toMoreReadable, toNormal, toStoreFormat } from '../../helpers';
 import { PopoverInfo } from '../PopoverInfo.tsx';
+import { getAccount, HelloContract } from '../../contracts';
 
 export const TransferModal: FC = observer(() => {
   const { isHelloContractLoading, symbol, isTransferModalOpen, transferModalClose, decimals } = helloTokenContractStore;
   const { isUserLoading, balance, account } = userStore;
-  const isLoading = isHelloContractLoading || isUserLoading;
+  const [isTransferLoading, setIsTransferLoading] = useState(false);
+  const isLoading = isTransferLoading || isHelloContractLoading || isUserLoading;
 
   const [receiver, setReceiver] = useState<Address>('0x');
   const [tokensCount, setTokensCount] = useState<number>(0);
@@ -32,8 +34,18 @@ export const TransferModal: FC = observer(() => {
   const timeoutTokensCountRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
   const handleOk = async () => {
-    // await createPost({ tag, content });
-    transferModalClose();
+    try {
+      setIsTransferLoading(true);
+      await HelloContract.write.transfer([receiver, toStoreFormat(tokensCount, decimals)], { account: await getAccount(true) });
+      await userStore.refetchUser();
+      transferModalClose();
+    } catch (e) {
+      const errorMessage = `Ошибка перевода: ${e instanceof Error ? e.message : e}`;
+      alert(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsTransferLoading(false);
+    }
   };
 
   const afterOpenChange = () => {
